@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}Мое хранилище{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <header>
+        <h1>iClown</h1>
+        <div class="header-controls">
+            <label class="theme-switch">
+                <input type="checkbox" id="theme-toggle" {% if dark_theme %}checked{% endif %}>
+                <span class="slider round"></span>
+            </label>
+            <a href="/logout" class="logout-btn">Выйти</a>
+        </div>
+    </header>
+    
+    <div class="main-content">
+        <div class="sidebar">
+            <form class="folder-form" method="POST" action="/create_folder">
+                <input type="text" name="folder_name" placeholder="Новая папка" required>
+                <input type="hidden" name="parent_id" value="{{ current_folder.id if current_folder else '' }}">
+                <button type="submit" class="btn">Создать папку</button>
+            </form>
+            
+            <form class="upload-form" method="POST" action="/upload" enctype="multipart/form-data" id="upload-form">
+                <div class="drop-zone" id="drop-zone">
+                    <span>Перетащите файлы сюда или</span>
+                    <input type="file" name="files" id="file-input" multiple style="display: none;">
+                    <label for="file-input" class="file-label">выберите файлы</label>
+                    <div class="selected-files" id="selected-files"></div>
+                </div>
+                <input type="hidden" name="folder_id" value="{{ current_folder.id if current_folder else '' }}">
+                <button type="submit" class="btn" id="upload-btn" style="display: none;">Загрузить файлы</button>
+                <div class="progress-container" id="progress-container" style="display: none;">
+                    <div class="progress-bar" id="progress-bar"></div>
+                    <span id="progress-text">0%</span>
+                </div>
+            </form>
+        </div>
+        
+        <div class="files-container">
+            <div class="breadcrumbs">
+                <a href="{{ url_for('dashboard') }}">Корневая папка</a>
+                {% for crumb in breadcrumbs %}
+                    &raquo; <a href="{{ url_for('dashboard', folder_id=crumb.id) }}">{{ crumb.name }}</a>
+                {% endfor %}
+                {% if current_folder %}
+                    &raquo; {{ current_folder.name }}
+                {% endif %}
+            </div>
+            
+            <div class="folders-grid">
+                {% for folder in folders %}
+                <div class="folder-card">
+                    <a href="{{ url_for('dashboard', folder_id=folder.id) }}" class="folder-link">
+                        <img src="/static/icons/folder.webp" alt="Папка" class="folder-icon">
+                        <span class="folder-name">{{ folder.name }}</span>
+                    </a>
+                    <a href="/delete_folder/{{ folder.id }}" class="delete-btn" onclick="return confirm('Удалить папку и все её содержимое?')">Удалить</a>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="files-grid">
+                {% for file in files %}
+                <div class="file-card">
+                    <div class="file-icon">
+                        {% if file.name.lower().endswith('.zip') %}
+                        <img src="/static/icons/zip.png" alt="ZIP">
+                        {% elif file.name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) %}
+                        <img src="/static/icons/photo.webp" alt="Image">
+                        {% elif file.name.lower().endswith('.exe') %}
+                        <img src="/static/icons/exe-file-type.png" alt="EXE">
+                        {% elif file.name.lower().endswith(('.doc', '.docx', '.odt')) %}
+                        <img src="/static/icons/doc.png" alt="Document">
+                        {% elif file.name.lower().endswith(('.xls', '.xlsx', '.ods')) %}
+                        <img src="/static/icons/xls.png" alt="Spreadsheet">
+                        {% elif file.name.lower().endswith(('.pdf')) %}
+                        <img src="/static/icons/pdf.png" alt="PDF">
+                        {% elif file.name.lower().endswith(('.mp3', '.wav', '.ogg')) %}
+                        <img src="/static/icons/audio.png" alt="Audio">
+                        {% elif file.name.lower().endswith(('.mp4', '.avi', '.mov')) %}
+                        <img src="/static/icons/video.png" alt="Video">
+                        {% elif file.name.lower().endswith(('.ovpn')) %}
+                        <img src="/static/icons/vpn.png" alt="Video">
+                        {% else %}
+                        <img src="/static/icons/file.png" alt="File">
+                        {% endif %}
+                    </div>
+                    <div class="file-info">
+                        <h3>{{ file.name }}</h3>
+                        <p>{{ (file.size / (1024*1024))|round(2) }} MB</p>
+                        <p>{{ file.uploaded_at.strftime('%d.%m.%Y %H:%M') }}</p>
+                    </div>
+                    <div class="file-actions">
+                        <a href="/download/{{ file.id }}" class="btn">Скачать</a>
+                        <a href="/delete_file/{{ file.id }}" class="btn delete-btn" onclick="return confirm('Удалить этот файл?')">Удалить</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.drop-zone {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 15px;
+    background-color: #fafafa;
+}
+
+.drop-zone:hover, .drop-zone.dragover {
+    border-color: #007bff;
+    background-color: #f0f8ff;
+}
+
+.file-label {
+    color: #007bff;
+    cursor: pointer;
+    text-decoration: underline;
+    margin-left: 5px;
+    font-weight: 500;
+}
+
+.selected-files {
+    margin-top: 15px;
+    text-align: left;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #e9ecef;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.file-item span:first-child {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 10px;
+}
+
+.remove-file {
+    color: #dc3545;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 18px;
+    padding: 0 5px;
+}
+
+.remove-file:hover {
+    color: #c82333;
+}
+
+.progress-container {
+    margin-top: 15px;
+    background-color: #e9ecef;
+    border-radius: 8px;
+    padding: 10px;
+    position: relative;
+}
+
+.progress-bar {
+    height: 20px;
+    background-color: #28a745;
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #000;
+    font-weight: bold;
+    text-shadow: 0 0 2px white;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const selectedFiles = document.getElementById('selected-files');
+    const uploadBtn = document.getElementById('upload-btn');
+    const uploadForm = document.getElementById('upload-form');
+    let filesToUpload = [];
+
+    // Обработка перетаскивания файлов
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', function() {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        
+        if (e.dataTransfer.files.length > 0) {
+            handleFiles(e.dataTransfer.files);
+        }
+    });
+
+    // Обработка выбора файлов через диалог
+    fileInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            handleFiles(this.files);
+        }
+    });
+
+    // Функция для обработки выбранных файлов
+    function handleFiles(files) {
+        filesToUpload = Array.from(files);
+        updateSelectedFilesList();
+        uploadBtn.style.display = filesToUpload.length > 0 ? 'block' : 'none';
+    }
+
+    // Обновление списка выбранных файлов
+    function updateSelectedFilesList() {
+        selectedFiles.innerHTML = '';
+        
+        if (filesToUpload.length === 0) {
+            selectedFiles.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 10px;">Файлы не выбраны</div>';
+            return;
+        }
+        
+        filesToUpload.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <span title="${file.name}">${file.name}</span>
+                <span>(${formatFileSize(file.size)})</span>
+                <span class="remove-file" data-index="${index}">×</span>
+            `;
+            selectedFiles.appendChild(fileItem);
+        });
+
+        // Обработка удаления файлов из списка
+        document.querySelectorAll('.remove-file').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const index = parseInt(this.getAttribute('data-index'));
+                filesToUpload.splice(index, 1);
+                updateSelectedFilesList();
+                uploadBtn.style.display = filesToUpload.length > 0 ? 'block' : 'none';
+            });
+        });
+    }
+
+    // Форматирование размера файла
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Обработка отправки формы
+    uploadForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (filesToUpload.length === 0) {
+            alert('Пожалуйста, выберите файлы для загрузки');
+            return;
+        }
+        
+        const formData = new FormData();
+        const folderId = document.querySelector('input[name="folder_id"]').value;
+        
+        // Добавляем все файлы в FormData
+        filesToUpload.forEach(file => {
+            formData.append('files', file);
+        });
+        
+        formData.append('folder_id', folderId);
+        
+        // Показываем прогресс
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        
+        progressContainer.style.display = 'block';
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'Загрузка...';
+        
+        // Отправка через AJAX
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', function(e) {
+            if (e.lengthComputable) {
+                const percentComplete = (e.loaded / e.total) * 100;
+                progressBar.style.width = percentComplete + '%';
+                progressText.textContent = Math.round(percentComplete) + '%';
+            }
+        });
+        
+        xhr.addEventListener('load', function() {
+            if (xhr.status === 200) {
+                progressText.textContent = 'Завершено!';
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                alert('Ошибка при загрузке файлов: ' + xhr.statusText);
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Загрузить файлы';
+                progressContainer.style.display = 'none';
+            }
+        });
+        
+        xhr.addEventListener('error', function() {
+            alert('Ошибка сети при загрузке файлов');
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Загрузить файлы';
+            progressContainer.style.display = 'none';
+        });
+        
+        xhr.open('POST', '/upload');
+        xhr.send(formData);
+    });
+
+    // Инициализация списка файлов
+    updateSelectedFilesList();
+});
+</script>
+{% endblock %}

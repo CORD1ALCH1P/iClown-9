@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IClown 9.0 - Register</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <h1 class="logo">IClown 9.0</h1>
+            <form method="POST" action="/register">
+                <div class="form-group">
+                    <input type="text" name="username" placeholder="Username" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" name="password" placeholder="Password" required>
+                </div>
+                <button type="submit" class="btn">Register</button>
+                <a href="/login" class="btn secondary">Login</a>
+                <div class="admin-contact">
+                    <p>Need help? Contact admin:</p>
+                    <a href="https://t.me/your_admin" target="_blank">@your_admin</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
